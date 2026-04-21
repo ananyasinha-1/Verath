@@ -239,3 +239,37 @@ def get_memory_graph() -> MemoryGraph:
 def update_memory_graph(memory: dict):
     """Update the memory graph with a new memory."""
     memory_graph.add_memory(memory)
+
+async def build_memory_graph(user_id: str, limit: int = 100) -> Dict:
+    """Fetch memories and build a graph representation for visualization."""
+    from app.services.memory_store import all_memories
+    
+    # Fetch memories from store
+    memories = await all_memories(user_id, limit=limit)
+    
+    # Create a fresh graph instance for this request
+    # (Alternatively we could use the global one if it's user-segmented, 
+    # but the current MemoryGraph class isn't user-segmented)
+    graph_instance = MemoryGraph()
+    
+    for mem in memories:
+        # Extract metadata
+        metadata = mem.get("metadata", {})
+        
+        # Format memory for the graph
+        memory_data = {
+            "id": str(mem.get("_id")),
+            "text": mem.get("text", ""),
+            "speaker": metadata.get("speaker", "unknown"),
+            "timestamp": mem.get("timestamp"),
+            "importance": metadata.get("importance", 0.5)
+        }
+        graph_instance.add_memory(memory_data)
+    
+    # Export and return formatted for D3/visualization
+    data = graph_instance.export_graph_data()
+    
+    return {
+        "nodes": data["nodes"],
+        "links": data["edges"] # Frontend expects 'links' or 'edges'
+    }

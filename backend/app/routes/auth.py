@@ -21,8 +21,6 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 # Rate limiting configuration
 limiter = Limiter(key_func=get_remote_address)
-router.state.limiter = limiter
-router.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────

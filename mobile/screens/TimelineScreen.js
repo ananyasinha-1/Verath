@@ -1,19 +1,33 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from "react-native";
+import React, { useState, useEffect, useRef } from "react";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Alert } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { getTimeline } from "../services/api";
+import { Audio } from "expo-av";
+import { getTimeline, deleteMemory } from "../services/api";
+import { API_BASE_URL } from "../config";
 
 export default function TimelineScreen() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [playingId, setPlayingId] = useState(null);
+  const [error, setError] = useState(null);
+  const soundRef = useRef(null);
 
   const fetchTimeline = async () => {
     setLoading(true);
-    const data = await getTimeline();
-    setEvents(data.timeline || []);
-    setLoading(false);
+    setError(null);
+    try {
+      const data = await getTimeline();
+      console.log('Timeline data:', data);
+      setEvents(data.timeline || []);
+    } catch (error) {
+      console.error('Error fetching timeline:', error);
+      setError(error.message || 'Failed to load timeline');
+      setEvents([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const onRefresh = async () => {
@@ -22,6 +36,73 @@ export default function TimelineScreen() {
     setEvents(data.timeline || []);
     setRefreshing(false);
   };
+
+  const playAudio = async (audioFile, eventId) => {
+    try {
+      // Stop any currently playing sound
+      if (soundRef.current) {
+        await soundRef.current.unloadAsync();
+        soundRef.current = null;
+      }
+
+      if (playingId === eventId) {
+        setPlayingId(null);
+        return;
+      }
+
+      if (audioFile) {
+        const audioUrl = audioFile.startsWith('http') ? audioFile : `${API_BASE_URL}/${audioFile.replace(/\\/g, '/')}`;
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: audioUrl },
+          { shouldPlay: true }
+        );
+        soundRef.current = sound;
+        setPlayingId(eventId);
+
+        sound.setOnPlaybackStatusUpdate((status) => {
+          if (!status.isLoaded) return;
+          if (status.didJustFinish) {
+            setPlayingId(null);
+          }
+        });
+      }
+    } catch (error) {
+      console.error("Error playing audio:", error);
+    }
+  };
+
+  const handleDelete = (eventId) => {
+    Alert.alert(
+      "Delete Memory",
+      "Are you sure you want to delete this memory?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            const result = await deleteMemory(eventId);
+            if (result.success !== false) {
+              setEvents(events.filter(e => e.id !== eventId));
+            } else {
+              Alert.alert("Error", result.error || "Failed to delete memory");
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  useEffect(() => {
+    return () => {
+      if (soundRef.current) {
+        soundRef.current.unloadAsync();
+      }
+    };
+  }, []);
 
   useEffect(() => {
     fetchTimeline();
@@ -49,12 +130,20 @@ export default function TimelineScreen() {
           <ActivityIndicator size="large" color="#38bdf8" />
           <Text style={styles.loadingText}>Syncing with Neural Core...</Text>
         </View>
+      ) : error ? (
+        <View style={styles.centerContainer}>
+          <MaterialCommunityIcons name="alert-circle" size={64} color="#ef4444" />
+          <Text style={styles.emptyText}>{error}</Text>
+          <TouchableOpacity style={styles.refreshButton} onPress={fetchTimeline}>
+            <Text style={styles.refreshButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
       ) : events.length === 0 ? (
         <View style={styles.centerContainer}>
           <MaterialCommunityIcons name="brain" size={64} color="rgba(255,255,255,0.1)" />
-          <Text style={styles.emptyText}>No neurological traces found today.</Text>
+          <Text style={styles.emptyText}>No memories from last 24 hours. Start recording to build your timeline.</Text>
           <TouchableOpacity style={styles.refreshButton} onPress={fetchTimeline}>
-            <Text style={styles.refreshButtonText}>Initialize Scan</Text>
+            <Text style={styles.refreshButtonText}>Refresh</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -82,32 +171,56 @@ export default function TimelineScreen() {
                     <Text style={styles.time}>
                       {new Date(event.timestamp * 1000).toLocaleDateString([], { month: 'short', day: 'numeric' })} • {new Date(event.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </Text>
-                    <View style={[
-                      styles.badge,
-                      { backgroundColor: event.importance > 0.7 ? "rgba(239, 68, 68, 0.1)" : "rgba(16, 185, 129, 0.1)" }
-                    ]}>
-                      <Text style={[
-                        styles.badgeText,
-                        { color: event.importance > 0.7 ? "#ef4444" : "#10b981" }
-                      ]}>{event.importance > 0.7 ? "Critical" : "Insight"}</Text>
+                    <View style={styles.headerRight}>
+                      <View style={[
+                        styles.badge,
+                        { backgroundColor: event.importance > 0.7 ? "rgba(239, 68, 68, 0.1)" : "rgba(16, 185, 129, 0.1)" }
+                      ]}>
+                        <Text style={[
+                          styles.badgeText,
+                          { color: event.importance > 0.7 ? "#ef4444" : "#10b981" }
+                        ]}>{event.importance > 0.7 ? "Critical" : "Insight"}</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.deleteButton}
+                        onPress={() => handleDelete(event.id)}
+                      >
+                        <MaterialCommunityIcons name="delete-outline" size={18} color="#ef4444" />
+                      </TouchableOpacity>
                     </View>
                   </View>
                   <Text style={styles.text}>{event.text}</Text>
                   <View style={styles.footer}>
                     <View style={styles.speakerBadge}>
-                      <MaterialCommunityIcons 
-                        name={event.speaker && event.speaker !== "unknown" ? "account-tie" : "account-outline"} 
-                        size={14} 
-                        color={event.speaker && event.speaker !== "unknown" ? "#38bdf8" : "#64748b"} 
+                      <MaterialCommunityIcons
+                        name={event.speaker && event.speaker !== "unknown" ? "account-tie" : "account-outline"}
+                        size={14}
+                        color={event.speaker && event.speaker !== "unknown" ? "#38bdf8" : "#64748b"}
                       />
                       <Text style={[styles.speaker, { color: event.speaker && event.speaker !== "unknown" ? "#38bdf8" : "#64748b" }]}>
                         {event.speaker && event.speaker !== "unknown" ? event.speaker : "Unknown Speaker"}
                       </Text>
                     </View>
-                    <View style={styles.sourceBadge}>
-                      <MaterialCommunityIcons name="headphones" size={14} color="#64748b" />
-                      <Text style={styles.sourceText}>Voice</Text>
-                    </View>
+                    {event.audio_file ? (
+                      <TouchableOpacity
+                        style={styles.sourceBadge}
+                        onPress={() => playAudio(event.audio_file, event.id)}
+                      >
+                        <MaterialCommunityIcons
+                          name={playingId === event.id ? "pause-circle" : "play-circle"}
+                          size={14}
+                          color={playingId === event.id ? "#38bdf8" : "#64748b"}
+                        />
+                        <Text style={[styles.sourceText, { color: playingId === event.id ? "#38bdf8" : "#64748b" }]}>
+                          {playingId === event.id ? "Playing" : "Voice"}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <View style={styles.sourceBadge}>
+                        <MaterialCommunityIcons name="headphones" size={14} color="#64748b" />
+                        <Text style={styles.sourceText}>Voice</Text>
+                      </View>
+                    )}
                   </View>
                 </LinearGradient>
               </View>
@@ -198,8 +311,12 @@ const styles = StyleSheet.create({
   },
   timelineLeft: {
     width: 20,
+    alignItems: 'center',
+  },
+  headerRight: {
+    flexDirection: "row",
     alignItems: "center",
-    marginRight: 16,
+    gap: 8,
   },
   dot: {
     width: 10,
@@ -209,6 +326,11 @@ const styles = StyleSheet.create({
     marginTop: 24,
     borderWidth: 2,
     borderColor: "#080b14",
+  },
+  deleteButton: {
+    padding: 4,
+    borderRadius: 6,
+    backgroundColor: "rgba(239, 68, 68, 0.1)",
   },
   line: {
     width: 1,

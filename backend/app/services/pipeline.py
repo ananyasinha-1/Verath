@@ -1,7 +1,7 @@
 import os
 import logging
+from datetime import datetime, timedelta
 from typing import Optional
-from datetime import datetime
 
 from app.models.memory import Memory
 from app.services.transcription import transcribe
@@ -14,7 +14,7 @@ from app.services.memory_extractor import memory_extractor
 from app.core.exceptions import TranscriptionError, EmbeddingError, MemoryStorageError
 from app.core.logging_config import logger
 
-async def process_audio(file_path: str, user_id: str) -> Optional[Memory]:
+async def process_audio(file_path: str, user_id: str, timestamp: Optional[str] = None) -> Optional[Memory]:
     """Process audio file through the complete pipeline with intelligent extraction."""
     try:
         # Check privacy mode
@@ -26,9 +26,9 @@ async def process_audio(file_path: str, user_id: str) -> Optional[Memory]:
         logger.info(f"Transcribing audio: {file_path}")
         text = transcribe(file_path)
         
-        # Skip if transcription is too short
-        if len(text.strip()) < 5:
-            logger.info("Skipping - transcription too short")
+        # Skip if transcription is too short or meaningless
+        if not text.strip() or len(text.strip()) < 10:
+            logger.info(f"Skipping - transcription too short or empty. Result: '{text}'")
             return None
         
         logger.info(f"Transcribed: {text[:100]}...")
@@ -82,9 +82,13 @@ async def process_audio(file_path: str, user_id: str) -> Optional[Memory]:
         )
         
         # Store in memory
+        # Use provided timestamp or default to current time
+        created_at = datetime.fromisoformat(timestamp) if timestamp else datetime.utcnow()
+        
         memory_id = await store_memory(
             user_id=user_id,
-            text=cleaned_text,
+            text=text,  # Store original full text instead of cleaned text
+            created_at=created_at,
             metadata={
                 "intent": intent,
                 "speaker": primary_speaker,
@@ -94,6 +98,8 @@ async def process_audio(file_path: str, user_id: str) -> Optional[Memory]:
                 "summary": summary,
                 "has_correction": has_correction,
                 "importance_boost": importance_boost,
+                "cleaned_text": cleaned_text,  # Store cleaned text in metadata for reference
+                "audio_file": file_path,
             }
         )
         memory.id = memory_id

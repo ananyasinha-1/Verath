@@ -3,6 +3,7 @@ import { API_BASE_URL } from "../config";
 import axios from "axios";
 
 const BASE_URL = API_BASE_URL;
+console.log("[API] Initialized with BASE_URL:", BASE_URL);
 
 // ── Token refresh lock to prevent race conditions ───────────────────────────────
 let isRefreshing = false;
@@ -114,6 +115,41 @@ const getAuthHeader = async () => {
   return token ? { 'Authorization': `Bearer ${token}` } : {};
 };
 
+export const uploadAudio = async (uri) => {
+  try {
+    const authHeader = await getAuthHeader();
+    
+    const formData = new FormData();
+    formData.append('file', {
+      uri: uri,
+      type: 'audio/wav',
+      name: `recording_${Date.now()}.wav`
+    });
+    
+    // Send current timestamp from mobile device
+    formData.append('timestamp', new Date().toISOString());
+    
+    const response = await fetch(`${BASE_URL}/record/upload`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        ...authHeader
+      },
+      body: formData
+    });
+    
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        return { success: false, error: errorData.detail || 'Upload failed' };
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error uploading audio:', error);
+    return { success: false, error: 'Network error during upload' };
+  }
+};
+
 export const askQuestion = async (q, options = {}) => {
   try {
     const authHeader = await getAuthHeader();
@@ -145,12 +181,32 @@ export const getTimeline = async () => {
     const response = await fetch(`${BASE_URL}/timeline`, {
       headers: { ...authHeader }
     });
-    
+
     if (!response.ok) return { timeline: [] };
     return await response.json();
   } catch (error) {
     console.warn('Timeline fetch failed:', error.message);
     return { timeline: [] };
+  }
+};
+
+export const deleteMemory = async (memoryId) => {
+  try {
+    const authHeader = await getAuthHeader();
+    const response = await fetch(`${BASE_URL}/memory/${memoryId}`, {
+      method: 'DELETE',
+      headers: { ...authHeader }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ detail: 'Delete failed' }));
+      return { success: false, error: errorData.detail || 'Server error during delete' };
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error deleting memory:', error);
+    return { success: false, error: 'Network error during delete' };
   }
 };
 
@@ -185,10 +241,17 @@ export const startRecording = async (duration = 10) => {
     
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-        return { success: false, error: errorData.detail };
+        return { success: false, error: errorData.detail || errorData.message || 'Server error' };
     }
     
-    return await response.json();
+    const data = await response.json();
+    if (!data.success) {
+        return { 
+            success: false, 
+            error: data.error || data.message || 'Processing failed' 
+        };
+    }
+    return data;
   } catch (error) {
     console.error('Error recording:', error);
     return { success: false, error: 'Failed to record audio' };
@@ -220,8 +283,7 @@ export const getStatistics = async () => {
     if (!response.ok) return { total: 0, by_intent: {}, by_speaker: {}, avg_importance: 0.0, recent_count: 0 };
     return await response.json();
   } catch (error) {
-    return { total: 0, by_intent: {refresh_token', data.refresh_token);
-    await AsyncStorage.setItem('sb_}, by_speak}, avg_importance: 0.0, recent_count: 0 };
+    return { total: 0, by_intent: {}, by_speaker: {}, avg_importance: 0.0, recent_count: 0 };
   }
 };
 
@@ -251,8 +313,6 @@ export const getVoiceProfiles = async () => {
     const response = await fetch(`${BASE_URL}/speaker/profiles`, {
       headers: { ...authHeader }
     });
-    refresh_token');
-    await AsyncStorage.removeItem('sb_
     if (!response.ok) throw new Error('Network response was not ok');
     return await response.json();
   } catch (error) {

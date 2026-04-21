@@ -25,9 +25,14 @@ def get_model() -> WhisperModel:
 def transcribe(audio_path: str) -> str:
     try:
         model = get_model()
-        segments, info = model.transcribe(audio_path, beam_size=5)
+        segments, info = model.transcribe(audio_path, beam_size=5, language='en')
+        segments = list(segments)
+        logger.info(f"Whisper found {len(segments)} segments. Language: {info.language} ({info.language_probability:.2f})")
+        for i, s in enumerate(segments):
+            logger.debug(f"Segment {i}: '{s.text}' (conf: {s.avg_logprob:.2f})")
+        
         text = " ".join(segment.text.strip() for segment in segments if segment.text.strip())
-        logger.info(f"Transcription complete. Language: {info.language} ({info.language_probability:.2f})")
+        logger.info(f"Final transcribed text: '{text}'")
         return text
     except Exception as e:
         logger.error(f"Transcription error: {e}")

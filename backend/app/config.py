@@ -54,7 +54,7 @@ class Settings(BaseSettings):
 
     # ── Server ────────────────────────────────────────────────────────────────
     host: str = "0.0.0.0"
-    port: int = 8002
+    port: int = 8000
     default_record_seconds: int = 10
     allow_cors: str = "*"
     env: str = "development"

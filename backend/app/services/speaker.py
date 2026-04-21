@@ -1,5 +1,6 @@
 from typing import List, Dict
 import torch
+from app.core.logging_config import logger
 
 try:
     from pyannote.audio import Pipeline  # type: ignore
@@ -29,22 +30,25 @@ def identify_speakers(audio_file: str) -> List[Dict]:
     """Identify speakers in audio file using diarization."""
     pipeline = _get_pipeline()
     if pipeline is None:
-        return [{"speaker": "unknown", "start": 0.0, "end": 10.0}]
+        logger.warning("Speaker diarization pipeline not available, using default speaker")
+        return [{"speaker": "You", "start": 0.0, "end": 10.0}]
 
     try:
         diarization = pipeline(audio_file)
         speakers = []
         for turn, _, speaker in diarization.itertracks(yield_label=True):
-            speakers.append({"speaker": speaker, "start": turn.start, "end": turn.end})
-        return speakers or [{"speaker": "unknown", "start": 0.0, "end": 10.0}]
+            # Map generic speaker labels to more user-friendly names
+            speaker_name = "Speaker " + speaker[-1] if speaker.startswith("SPEAKER") else speaker
+            speakers.append({"speaker": speaker_name, "start": turn.start, "end": turn.end})
+        return speakers or [{"speaker": "You", "start": 0.0, "end": 10.0}]
     except Exception as e:
-        print(f"Error in speaker identification: {e}")
-        return [{"speaker": "unknown", "start": 0.0, "end": 10.0}]
+        logger.warning(f"Error in speaker identification: {e}, using default speaker")
+        return [{"speaker": "You", "start": 0.0, "end": 10.0}]
 
 def get_primary_speaker(speakers: List[Dict]) -> str:
     """Get the speaker who spoke the most."""
     if not speakers:
-        return "unknown"
+        return "You"
     
     # Calculate total speaking time for each speaker
     speaker_times = {}
@@ -54,4 +58,6 @@ def get_primary_speaker(speakers: List[Dict]) -> str:
         speaker_times[speaker] = speaker_times.get(speaker, 0) + duration
     
     # Return speaker with most speaking time
-    return max(speaker_times.items(), key=lambda x: x[1])[0]
+    if speaker_times:
+        return max(speaker_times.items(), key=lambda x: x[1])[0]
+    return "You"

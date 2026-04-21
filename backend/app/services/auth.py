@@ -1,14 +1,13 @@
 import logging
-from typing import Optional
-import bcrypt
-importbryp
+import uuid
+from datetime import datetime, timedelta
+from typing import Dict, Optional
 
-
 import bcrypt
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from motor.motor_asyncio import AsyncIOMotorClient
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.config import settings
 
@@ -18,8 +17,8 @@ _mongo = AsyncIOMotorClient(settings.mongo_uri)
 _db = _mongo[settings.database_name]
 _users_col = _db["users"]
 
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-REFRESH_TOKEN_EXPIRE_DAYS = 7
+ACCESS_TOKEN_EXPIRE_MINUTES = 10080  # 7 days in minutes
+REFRESH_TOKEN_EXPIRE_DAYS = 30
 
 ALGORITHM = "HS256"
 

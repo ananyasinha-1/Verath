@@ -1,7 +1,6 @@
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 import logging
 import json
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
-from app.services.auth import get_current_user_id_ws
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

@@ -1,5 +1,6 @@
 import logging
 from contextlib import asynccontextmanager
+from datetime import datetime
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
@@ -12,7 +13,9 @@ from app.services.reminder_service import check_and_fire_reminders
 from app.services.database import get_db
 
 # ── Routers ───────────────────────────────────────────────────────────────────
-from app.routes.auth import router as auth_router
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from app.routes.auth import router as auth_router, limiter
 from app.routes.query import router as query_router
 from app.routes.record import router as record_router
 from app.routes.advanced import router as advanced_router
@@ -153,6 +156,9 @@ app = FastAPI(
     description="AI-powered personal memory system",
     lifespan=lifespan,
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,

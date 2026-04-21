@@ -45,6 +45,13 @@ class MemoryExtractor:
         Example: "let's meet tomorrow... no no day after tomorrow"
         Returns: (has_correction, corrected_text)
         """
+        # Handle "no no" or "no, no" patterns - take the text after the last "no"
+        no_pattern = r'(?:no\s*,?\s*)+(.+?)(?:\.|$|no\s*,?\s*)'
+        no_match = re.search(no_pattern, text, re.IGNORECASE)
+        if no_match:
+            corrected = no_match.group(1).strip()
+            return True, corrected
+        
         sentences = re.split(r'[.!?]+', text)
         sentences = [s.strip() for s in sentences if s.strip()]
         
@@ -116,8 +123,14 @@ class MemoryExtractor:
         for filler in filler_words:
             text = re.sub(rf'\b{filler}\b', '', text, flags=re.IGNORECASE)
         
-        # Remove repeated words
+        # Remove repeated words (e.g., "meet tomorrow, meet tomorrow" -> "meet tomorrow")
         text = re.sub(r'\b(\w+)(\s+\1)+\b', r'\1', text, flags=re.IGNORECASE)
+        
+        # Remove repeated phrases (e.g., "let's meet tomorrow, let's meet tomorrow" -> "let's meet tomorrow")
+        text = re.sub(r'(.{4,})\s+\1', r'\1', text, flags=re.IGNORECASE)
+        
+        # Remove consecutive duplicates like "no no" -> "no"
+        text = re.sub(r'\b(\w+)\s+\1\b', r'\1', text, flags=re.IGNORECASE)
         
         # Normalize whitespace
         text = re.sub(r'\s+', ' ', text).strip()

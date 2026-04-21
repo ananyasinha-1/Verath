@@ -2,17 +2,10 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from app.services.query_engine import run_query
 from app.models.schema import QueryResponse
-from app.services.auth import verify_access_token
+from app.services.auth import verify_access_token, get_current_user_id
 from app.core.logging_config import logger
 
 router = APIRouter()
-
-def get_current_user_id(token: str = Query(...)) -> str:
-    """Extract and verify user ID from access token."""
-    user_id = verify_access_token(token)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    return user_id
 
 @router.get("/query", response_model=QueryResponse)
 async def query(
@@ -34,6 +27,8 @@ async def query(
             intent_filter=intent_filter,
             min_importance=min_importance
         )
+        
+        logger.info(f"Query result sources count: {len(result.get('sources', []))}")
         
         # Add pagination metadata
         total_sources = len(result.get("sources", []))

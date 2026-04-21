@@ -11,8 +11,9 @@ import {
   Platform,
   StyleSheet,
 } from 'react-native';
-import { FontAwesome } from '@expo/vector-icons';
-import { askQuestion, startRecording } from '../services/api';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { askQuestion, uploadAudio } from '../services/api';
+import { Audio } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function AskScreen({ navigation }) {
@@ -72,28 +73,56 @@ export default function AskScreen({ navigation }) {
   const handleVoiceInput = async () => {
     if (recording) return;
 
-    setRecording(true);
-    setAnswer('');
-    setSources([]);
-
     try {
-      const response = await startRecording(5);
+      // Request permissions
+      const permission = await Audio.requestPermissionsAsync();
+      if (permission.status !== 'granted') {
+          Alert.alert('Permission denied', 'Microphone access is required for voice input.');
+          return;
+      }
+
+      await Audio.setAudioModeAsync({
+          allowsRecordingIOS: true,
+          playsInSilentModeIOS: true,
+      });
+
+      setRecording(true);
+      setAnswer('Listening...');
+      setSources([]);
+
+      // Start local recording
+      const localRecording = new Audio.Recording();
+      await localRecording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      await localRecording.startAsync();
+
+      // Record for 5 seconds (or add a "Stop" button later, but for now 5s is fine)
+      await new Promise(resolve => setTimeout(resolve, 5000));
+
+      await localRecording.stopAndUnloadAsync();
+      const uri = localRecording.getURI();
+
+      setAnswer('Neural processing - Syncing to brain...');
+      
+      const response = await uploadAudio(uri);
       if (response.success) {
-        setAnswer('Processing your voice input...');
+        setAnswer('Voice captured. Analyzing memory contexts...');
         setTimeout(async () => {
           try {
-            const queryResponse = await askQuestion('What did I just record?');
+            const queryResponse = await askQuestion('Summarize what I just said');
             setAnswer(queryResponse.answer);
             setSources(queryResponse.sources || []);
           } catch (error) {
-            setAnswer('Voice recording processed. You can now ask questions about your memory.');
+            setAnswer('Memory successfully captured and indexed.');
           }
-        }, 2000);
+        }, 1500);
       } else {
-        Alert.alert('Error', response.error || 'Failed to record audio');
+        Alert.alert('Error', response.error || 'Failed to process audio');
+        setAnswer('');
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to record audio');
+      console.error('Mobile voice input error:', error);
+      Alert.alert('Error', 'Failed to capture voice input');
+      setAnswer('');
     } finally {
       setRecording(false);
     }
@@ -104,7 +133,7 @@ export default function AskScreen({ navigation }) {
       <View style={styles.onboardingCard}>
         {onboardingStep === 0 && (
           <>
-            <FontAwesome name="brain" size={60} color="#6366f1" />
+            <MaterialCommunityIcons name="brain" size={60} color="#6366f1" />
             <Text style={styles.onboardingTitle}>Welcome to SecondBrain</Text>
             <Text style={styles.onboardingText}>
               What do you want to remember? Lectures, meetings, conversations, or daily life?
@@ -117,7 +146,7 @@ export default function AskScreen({ navigation }) {
 
         {onboardingStep === 1 && (
           <>
-            <FontAwesome name="microphone" size={60} color="#6366f1" />
+            <MaterialCommunityIcons name="microphone" size={60} color="#6366f1" />
             <Text style={styles.onboardingTitle}>Microphone Access</Text>
             <Text style={styles.onboardingText}>
               SecondBrain needs microphone access to record and transcribe your conversations.
@@ -130,7 +159,7 @@ export default function AskScreen({ navigation }) {
 
         {onboardingStep === 2 && (
           <>
-            <FontAwesome name="lightbulb" size={60} color="#6366f1" />
+            <MaterialCommunityIcons name="lightbulb-on-outline" size={60} color="#6366f1" />
             <Text style={styles.onboardingTitle}>Try It Out</Text>
             <Text style={styles.onboardingText}>
               Ask anything like "What did I do today?" or record a voice note.
@@ -156,7 +185,7 @@ export default function AskScreen({ navigation }) {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>SecondBrain</Text>
         <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
-          <FontAwesome name="cog" size={24} color="#fff" />
+          <MaterialCommunityIcons name="cog" size={24} color="#fff" />
         </TouchableOpacity>
       </View>
 
@@ -169,7 +198,7 @@ export default function AskScreen({ navigation }) {
         {answer ? (
           <View style={styles.answerContainer}>
             <View style={styles.answerHeader}>
-              <FontAwesome name="robot" size={20} color="#6366f1" />
+              <MaterialCommunityIcons name="robot" size={20} color="#6366f1" />
               <Text style={styles.answerLabel}>SecondBrain</Text>
             </View>
             <Text style={styles.answerText}>{answer}</Text>
@@ -179,7 +208,7 @@ export default function AskScreen({ navigation }) {
                 <Text style={styles.sourcesTitle}>Sources</Text>
                 {sources.map((source, index) => (
                   <View key={index} style={styles.sourceItem}>
-                    <FontAwesome name="user-circle" size={14} color="#888" />
+                    <MaterialCommunityIcons name="account-circle" size={14} color="#888" />
                     <Text style={styles.sourceText}>
                       {source.speaker} • {source.timestamp} • {(source.importance * 100).toFixed(0)}%
                     </Text>
@@ -190,7 +219,7 @@ export default function AskScreen({ navigation }) {
           </View>
         ) : (
           <View style={styles.placeholderContainer}>
-            <FontAwesome name="comments" size={60} color="#374151" />
+            <MaterialCommunityIcons name="forum-outline" size={60} color="#374151" />
             <Text style={styles.placeholderText}>
               Ask anything about your memories, or record a voice note
             </Text>
@@ -227,14 +256,14 @@ export default function AskScreen({ navigation }) {
           onPress={handleVoiceInput}
           disabled={recording || loading}
         >
-          <FontAwesome name="microphone" size={24} color="#6366f1" />
+          <MaterialCommunityIcons name="microphone" size={24} color="#6366f1" />
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.sendButton, !query.trim() && styles.sendButtonDisabled]}
           onPress={handleSubmit}
           disabled={!query.trim() || loading}
         >
-          <FontAwesome name="paper-plane" size={24} color="#fff" />
+          <MaterialCommunityIcons name="send" size={24} color="#fff" />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>

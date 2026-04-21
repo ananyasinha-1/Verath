@@ -42,14 +42,15 @@ def _memories_collection():
 async def store_memory(
     user_id: str,
     text: str,
-    metadata: Dict[str, Any]
+    metadata: Dict[str, Any],
+    created_at: Optional[datetime] = None
 ) -> str:
     """
     Store a memory in both MongoDB (full document) and ChromaDB (vector + metadata).
     Returns the new memory's ID.
     """
     mem_id = str(uuid.uuid4())
-    timestamp = datetime.utcnow()
+    timestamp = created_at if created_at else datetime.utcnow()
     
     # Sanitize metadata for ChromaDB (no nested dicts, no MongoDB-specific types)
     sanitized_metadata = {

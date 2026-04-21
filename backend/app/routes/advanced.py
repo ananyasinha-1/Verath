@@ -86,7 +86,7 @@ async def statistics(user_id: str = Depends(get_current_user_id)):
 
 @router.get("/export")
 async def export_memories(
-    format: str = Query("json", regex="^(json|csv)$"),
+    format: str = Query("json", pattern="^(json|csv)$"),
     intent_filter: str = Query(None),
     start_date: str = Query(None),
     end_date: str = Query(None),
@@ -154,6 +154,7 @@ async def export_memories(
             
     except Exception as e:
         logger.error(f"Error exporting memories: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to export memories")
 
 
 @router.post("/cache/invalidate")
@@ -188,5 +189,3 @@ async def memory_graph(
     except Exception as e:
         logger.error(f"Error building memory graph: {e}", exc_info=True)
         return {"nodes": [], "links": []}
-    return get_cache_stats()
-        raise HTTPException(status_code=500, detail="Failed to export memories")

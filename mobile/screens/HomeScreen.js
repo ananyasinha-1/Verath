@@ -3,7 +3,8 @@ import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing, Dimensions,
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getStatus, getInsights, startRecording, getTimeline } from "../services/api";
+import { getStatus, getInsights, uploadAudio, getTimeline } from "../services/api";
+import { Audio } from "expo-av";
 
 const { width } = Dimensions.get("window");
 
@@ -18,6 +19,7 @@ export default function HomeScreen() {
   const [neuralStream, setNeuralStream] = useState([]);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingStatus, setRecordingStatus] = useState("");
+  const recordingRef = useRef(null);
   const recordingActiveRef = useRef(false);
 
   const fetchStats = async () => {
@@ -44,41 +46,65 @@ export default function HomeScreen() {
 
   const startVoiceRecording = async () => {
     try {
+      // Request permissions
+      const permission = await Audio.requestPermissionsAsync();
+      if (permission.status !== 'granted') {
+          setRecordingStatus("Permission to access microphone denied");
+          return;
+      }
+
+      await Audio.setAudioModeAsync({
+          allowsRecordingIOS: true,
+          playsInSilentModeIOS: true,
+      });
+
       setIsRecording(true);
-      setRecordingStatus("Starting microphone...");
+      setRecordingStatus("Starting mobile microphone...");
       recordingActiveRef.current = true;
       
-      // Continuous recording loop with proper cancellation
       const recordLoop = async () => {
         while (recordingActiveRef.current && isListening) {
           try {
-            const result = await startRecording(5); // Reduced to 5 seconds for faster response
+            console.log("[Mic] Beginning 15s local capture segment...");
+            setRecordingStatus("Recording active - Neural capture in progress");
+            
+            // 1. Start local recording
+            const recording = new Audio.Recording();
+            await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+            await recording.startAsync();
+            recordingRef.current = recording;
+
+            // 2. Wait for segment duration
+            await new Promise(resolve => setTimeout(resolve, 15000));
+
             if (!recordingActiveRef.current || !isListening) {
-              break; // Stop immediately if recording was cancelled
+                await recording.stopAndUnloadAsync();
+                break;
             }
+
+            // 3. Stop and get URI
+            await recording.stopAndUnloadAsync();
+            const uri = recording.getURI();
+            recordingRef.current = null;
+
+            // 4. Upload to backend
+            setRecordingStatus("Neural processing - Syncing to brain");
+            const result = await uploadAudio(uri);
             
             if (result.success) {
-              setRecordingStatus("Recording active - Saving to timeline");
-              // Fetch timeline after each recording to sync data
+              setRecordingStatus("Data synced - Update complete");
               await fetchTimelineData();
             } else {
-              setRecordingStatus(`Recording failed: ${result.error}`);
-              // Wait before retrying only if still active
-              if (recordingActiveRef.current && isListening) {
-                await new Promise(resolve => setTimeout(resolve, 2000));
-              }
-            }
-          } catch (error) {
-            console.error("Error in recording loop:", error);
-            setRecordingStatus("Recording error - Retrying...");
-            // Wait before retrying only if still active
-            if (recordingActiveRef.current && isListening) {
+              setRecordingStatus(`Sync failed: ${result.error || "Network error"}`);
               await new Promise(resolve => setTimeout(resolve, 2000));
             }
+          } catch (error) {
+            console.error("Error in local recording loop:", error);
+            setRecordingStatus("Mic error - Retrying...");
+            await new Promise(resolve => setTimeout(resolve, 3000));
           }
         }
         
-        // Clean up when loop exits
         if (!recordingActiveRef.current || !isListening) {
           setIsRecording(false);
           setRecordingStatus("");
@@ -87,8 +113,8 @@ export default function HomeScreen() {
       
       recordLoop();
     } catch (error) {
-      console.error("Error starting recording:", error);
-      setRecordingStatus("Recording error");
+      console.error("Error initializing mobile mic:", error);
+      setRecordingStatus("Mic init error");
       setIsRecording(false);
       recordingActiveRef.current = false;
     }

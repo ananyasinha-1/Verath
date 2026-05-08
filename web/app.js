@@ -1,4 +1,4 @@
-const API_BASE = "http://localhost:8000";
+const API_BASE = "http://127.0.0.1:8000";
 let AUTH_TOKEN = localStorage.getItem('verath_token');
 let currentSection = 'dashboard';
 let statsCache = null;

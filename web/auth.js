@@ -3,7 +3,7 @@
  * Connects to FastAPI backend
  */
 
-const API_BASE = "http://localhost:8000";
+const API_BASE = "http://127.0.0.1:8000";
 
 // Tab switching
 function showLogin() {
@@ -36,8 +36,8 @@ async function handleLogin(e) {
     try {
         const response = await fetch(`${API_BASE}/auth/login`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({ username, password })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
         });
 
         const data = await response.json();
@@ -72,7 +72,7 @@ async function handleRegister(e) {
     errorEl.textContent = '';
 
     try {
-        const response = await fetch(`${API_BASE}/auth/register`, {
+        const response = await fetch(`${API_BASE}/auth/signup`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password })

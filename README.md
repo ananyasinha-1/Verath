@@ -928,7 +928,7 @@ python -m venv venv
 
 # Activate virtual environment
 # On Windows:
-.venv\Scripts\activate
+venv\Scripts\activate
 # On macOS/Linux:
 source venv/bin/activate
 
@@ -953,10 +953,19 @@ cp .env.example .env
 Example `.env` file:
 
 ```env
-# Ollama Settings
+# Verath Configuration
+
+# LLM Providers (Groq + Gemini Fallback)
+GROQ_API_KEY=           # console.groq.com — free, 30 RPM
+GEMINI_API_KEY=         # aistudio.google.com — free, generous limits
+
+# Embeddings (Ollama OR Gemini)
+EMBED_PROVIDER=ollama   # 'ollama' or 'gemini'
 OLLAMA_URL=http://localhost:11434
-MODEL_NAME=mistral
 EMBED_MODEL=nomic-embed-text
+
+# Legacy Ollama Settings (kept for compatibility)
+MODEL_NAME=mistral
 
 # Whisper Settings
 WHISPER_MODEL=base
@@ -967,18 +976,37 @@ PORT=8000
 DEFAULT_RECORD_SECONDS=10
 
 # CORS Settings
-ALLOW_CORS=*
+ALLOW_CORS=http://localhost:8080,http://localhost:3000,*
 
 # Storage Paths
 VECTOR_DB_PATH=data/chroma_db
 VOICE_DB_PATH=data/voices.pkl
 
-# MongoDB Configuration (REQUIRED)
-MONGO_URI=mongodb+srv://your-username:your-password@cluster0.example.mongodb.net/
-DATABASE_NAME=Verath
+# MongoDB Configuration
+MONGO_URI=mongodb+srv://your-username:your-password@cluster0.d7dlkdt.mongodb.net/
+DATABASE_NAME=verath
 
-# Security (REQUIRED)
-SECRET_KEY=generate-a-long-random-secret-key-min-32-characters
+# Security
+SECRET_KEY=generate-a-long-random-secret-key-herettings
+
+# Audio Settings
+AUDIO_SAMPLE_RATE=16000
+AUDIO_CHANNELS=1
+AUDIO_FORMAT=int16
+
+# Processing Settings
+MAX_AUDIO_CHUNK_SIZE=30
+SILENCE_THRESHOLD=0.01
+MIN_TRANSCRIPTION_LENGTH=5
+
+# Memory Settings
+MAX_MEMORY_RESULTS=100
+MEMORY_IMPORTANCE_THRESHOLD=0.6
+
+# UI Settings
+THEME=dark
+AUTO_REFRESH_INTERVAL=30
+
 ```
 
 #### 4. Start MongoDB
@@ -994,22 +1022,6 @@ docker-compose up -d mongodb
 3. Get the connection string
 4. Set `MONGO_URI` in `.env`
 
-#### 5. Install Ollama and Pull Models
-
-```bash
-# Install Ollama (if not already installed)
-# Visit: https://ollama.ai/download
-
-# Pull required models
-ollama pull mistral
-ollama pull nomic-embed-text
-```
-
-#### 6. Start Ollama Server
-
-```bash
-ollama serve
-```
 
 #### 7. Start the Backend Server
 

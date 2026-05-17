@@ -122,7 +122,7 @@ class ExtractionPipeline:
             return False, text
 
         # Detection pattern for segment starts
-        correction_start_pattern = r'^(?:no\s+no|wait|actually|sorry|correction|i\s+mean|not\s+that)+(.*)$'
+        correction_start_pattern = r'^(?:no\s+no|wait(?!\s+for)|actually|sorry|correction|i\s+mean|not\s+that)+(.*)$'
         
         corrected_segments = []
         has_correction = False

@@ -126,7 +126,7 @@ Return as a bulleted list, one insight per line:
                 unix_ts = ts.timestamp()
             elif isinstance(ts, str):
                 try:
-                    unix_ts = datetime.fromisoformat(ts).timestamp()
+                    unix_ts = datetime.fromisoformat(ts.replace("Z", "+00:00")).timestamp()
                 except:
                     pass
 

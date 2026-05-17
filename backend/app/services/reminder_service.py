@@ -56,7 +56,7 @@ async def check_and_fire_reminders() -> int:
             try:
                 # Try to parse as ISO format first
                 if isinstance(parsed_str, str):
-                    parsed_date = datetime.fromisoformat(parsed_str)
+                    parsed_date = datetime.fromisoformat(parsed_str.replace("Z", "+00:00"))
                 else:
                     continue
             except (ValueError, TypeError):

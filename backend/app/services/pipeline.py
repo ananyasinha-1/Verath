@@ -93,7 +93,7 @@ async def process_audio(file_path: str, user_id: str, timestamp: Optional[str] =
         
         # Store in memory
         # Use provided timestamp or default to current time
-        created_at = datetime.fromisoformat(timestamp) if timestamp else datetime.utcnow()
+        created_at = datetime.fromisoformat(timestamp.replace("Z", "+00:00")) if timestamp else datetime.utcnow()
         
         memory_id = await store_memory(
             user_id=user_id,

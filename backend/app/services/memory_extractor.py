@@ -55,7 +55,7 @@ class MemoryExtractor:
 
         # 2. Handle "no no" or "no wait" patterns at the start of a segment
         # This is a common pattern for immediate speech correction
-        correction_start_pattern = r'^(?:no\s*,?\s*|wait\s*,?\s*|actually\s*,?\s*|sorry\s*,?\s*|correction\s*,?\s*|correction\s*:?\s*)+(.*)$'
+        correction_start_pattern = r'^(?:no\s*,?\s*|wait(?!\s+for)\s*,?\s*|actually\s*,?\s*|sorry\s*,?\s*|correction\s*,?\s*|correction\s*:?\s*)+(.*)$'
         
         corrected_segments = []
         has_correction = False
